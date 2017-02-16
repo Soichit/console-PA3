@@ -15,16 +15,18 @@ namespace ConsoleApplication1
 {
     class Program
     {
-
-        private static CloudQueue queue;
+        private static CloudQueue xmlQueue;
+        private static CloudQueue htmlQueue;
         private static CloudTable table;
 
         static void Main(string[] args)
         {
-            //CloudStorageAccount storageAccount = CloudStorageAccount.Parse(
-            //     CloudConfigurationManager.GetSetting("StorageConnectionString"));
-            //CloudQueueClient queueClient = storageAccount.CreateCloudQueueClient();
-            //queue = queueClient.GetQueueReference("myurls");
+            CloudStorageAccount storageAccount = CloudStorageAccount.Parse(
+                 CloudConfigurationManager.GetSetting("StorageConnectionString"));
+            CloudQueueClient queueClient = storageAccount.CreateCloudQueueClient();
+            xmlQueue = queueClient.GetQueueReference("myXml");
+            htmlQueue = queueClient.GetQueueReference("myHtml");
+
 
             //CloudTableClient tableClient = storageAccount.CreateCloudTableClient();
             //table = tableClient.GetTableReference("sum");
@@ -36,18 +38,21 @@ namespace ConsoleApplication1
             //table.Execute(insertOperation);
 
 
-            //CloudQueueMessage message = queue.GetMessage(TimeSpan.FromMinutes(5));
-            //if (message != null)
-            //{
-            //    Console.WriteLine(message.AsString);
-            //    //queue.DeleteMessage(message);
-            //    crawl(message);
-            //}
+            CloudQueueMessage message;
             string url = "http://www.cnn.com/robots.txt";
-            //crawlPage(url);
-
             //parseRobot(url);
+            //crawlPage(url);
             parseXML("http://www.cnn.com/sitemaps/sitemap-index.xml");
+            do
+            {
+                message = xmlQueue.GetMessage(TimeSpan.FromMinutes(5));
+                xmlQueue.DeleteMessage(message);
+                Console.WriteLine(message.AsString);
+                parseXML(message.AsString);
+            } while (message != null);
+
+            Console.WriteLine("done");
+            Console.ReadLine();
         }
 
         public static void crawlPage(String url)
@@ -80,6 +85,7 @@ namespace ConsoleApplication1
         public static void parseRobot(string url)
         {
             string baseUrl = url.Substring(0, url.Length - 11);
+            // global variables
             HashSet<string> disallows = new HashSet<string>();
             List<string> sitemaps = new List<string>();
 
@@ -112,11 +118,8 @@ namespace ConsoleApplication1
             string output = string.Join("\r\n", disallows.ToArray());
             string output2 = string.Join("\r\n", sitemaps.ToArray());
             Console.WriteLine(output2);
-            Console.WriteLine("done");
-            Console.ReadLine();
             //checkSitemap(url, reader);
         }
-
 
         public static void parseXML(string url)
         {
@@ -129,17 +132,13 @@ namespace ConsoleApplication1
                 {
                     case XmlNodeType.Element: // The node is an element.
                         tag = reader.Name;
-                        //while (reader.MoveToNextAttribute()) // Read the attributes.
-                            //Console.Write(" " + reader.Name + "='" + reader.Value + "'");
                         break;
                     case XmlNodeType.Text: //Display the text in each element.
-
                         // add timestamp
                         if (tag == "lastmod")
                         {
                             //Console.WriteLine(reader.Value);
                         }
-
                         if (tag == "loc")
                         {
                             string link = reader.Value;
@@ -148,18 +147,19 @@ namespace ConsoleApplication1
                             {
                                 // add to xml queue
                                 Console.WriteLine(reader.Value);
+                                CloudQueueMessage xmlLink = new CloudQueueMessage(reader.Value);
+                                xmlQueue.AddMessage(xmlLink); //storage error?
                             } else if (link.Substring(link.Length - 5) == ".html")
                             {
                                 // add to url queue
-                                //Console.WriteLine(reader.Value);
+                                Console.WriteLine(reader.Value);
+                                CloudQueueMessage htmlLink = new CloudQueueMessage(reader.Value);
+                                xmlQueue.AddMessage(htmlLink);
                             }                
                         }
                         break;
-                    //case XmlNodeType.EndElement: //Display the end of the element.
-                    //    break;
                 }
             }
-            Console.ReadLine();
         }
     }
 }
