@@ -17,10 +17,11 @@ namespace ConsoleApplication1
     class Program
     {
         //private static CloudQueue xmlQueue;
-       /private static CloudQueue htmlQueue;
+        private static CloudQueue htmlQueue;
         private static List<String> xmlList;
-        private static CloudTable table;
+        //private static CloudTable table;
         private static DateTime cutoffDate;
+        private static HashSet<string> disallows;
 
         static void Main(string[] args)
         {
@@ -30,9 +31,7 @@ namespace ConsoleApplication1
 
             //xmlQueue = queueClient.GetQueueReference("myxml");
             //xmlQueue.CreateIfNotExists();
-            List<String> xmlList = new List<String>();
-            htmlQueue = queueClient.GetQueueReference("myhtml");
-            htmlQueue.CreateIfNotExists();
+            
 
             //CloudTableClient tableClient = storageAccount.CreateCloudTableClient();
             //table = tableClient.GetTableReference("sum");
@@ -44,44 +43,116 @@ namespace ConsoleApplication1
             //table.Execute(insertOperation);
 
 
-            Console.WriteLine("1");
+            Console.WriteLine("START");
+            xmlList = new List<String>();
+            htmlQueue = queueClient.GetQueueReference("myhtml");
+            htmlQueue.CreateIfNotExists();
+            disallows = new HashSet<string>();
             cutoffDate = new DateTime(2016, 12, 1); // 12/1/2016
-
-            //parseRobot(url);
-            parseHTML("http://www.cnn.com/");
-            parseHTML("http://www.cnn.com/2017/02/16/us/museum-removes-art-from-immigrants-trnd");
-
+            CloudQueueMessage message = new CloudQueueMessage("");
 
             string url = "http://www.cnn.com/robots.txt";
-            CloudQueueMessage message = new CloudQueueMessage("");
-            //CloudQueueMessage message2 = new CloudQueueMessage("");
+            parseRobot(url);
 
 
-            while (message != null && xmlList.Any())
+            //parseHTML("http://www.cnn.com/");
+            //parseHTML("http://www.cnn.com/2017/02/16/us/museum-removes-art-from-immigrants-trnd");
+
+
+            parseXML("http://www.cnn.com/sitemaps/sitemap-index.xml");
+            Console.WriteLine(xmlList.Count()); //285
+
+            //while (message != null && xmlList.Any())
+            //{
+            //    //parse xml
+            //    if (xmlList.Any())
+            //    {
+            //        var lastItem = xmlList.Last();
+            //        xmlList.Remove(xmlList.Last());
+            //        parseXML(lastItem);
+            //    }
+            //    //parse html
+            //    else
+            //    {
+            //        message = htmlQueue.GetMessage(TimeSpan.FromMinutes(5));
+
+            //        if (message != null)
+            //        {
+            //            Console.WriteLine(message.AsString);
+            //            htmlQueue.DeleteMessage(message);
+            //            parseHTML(message.AsString);
+            //        }
+            //    }
+            //}
+
+            Console.WriteLine("DONE");
+            Console.ReadLine();
+        }
+
+
+        public static void parseXML(string url)
+        {
+            Console.WriteLine("parseXML()");
+            XmlTextReader reader = new XmlTextReader(url);
+            string tag = "";
+            Boolean dateAllowed = true;
+            while (reader.Read())
             {
-                // parse xml
-                if (xmlList.Any())
+                dateAllowed = true; //for cases where lastmod tag doesn't exist
+                switch (reader.NodeType)
                 {
-                    var lastItem = xmlList.Last();
-                    xmlList.Remove(xmlList.Last());
-                    parseXML(lastItem);
-                }
-                // parse html
-                else
-                {
-                    message = htmlQueue.GetMessage(TimeSpan.FromMinutes(5));
-                    
-                    if (message != null)
-                    {
-                        //Console.WriteLine(message.AsString);
-                        htmlQueue.DeleteMessage(message);
-                        parseHTML(message.AsString);
-                    }
+                    case XmlNodeType.Element: // tag types
+                        tag = reader.Name;
+                        break;
+                    case XmlNodeType.Text: // text within tags
+                        // add timestamp
+                        if (tag == "lastmod")
+                        {
+                            string date = reader.Value.Substring(0, 10); //format: 2017-02-17 
+                            DateTime dateTime = Convert.ToDateTime(date);
+                            int compare = DateTime.Compare(dateTime, cutoffDate);
+                            //Console.WriteLine("compare: " + compare);
+                            if (compare >= 0)
+                            {
+                                dateAllowed = true;
+                            } else
+                            {
+                                dateAllowed = false;
+                            }
+                        }
+                        if (tag == "loc")
+                        {
+                            string link = reader.Value;
+                            //Console.WriteLine(link.Substring(link.Length - 4));
+                            if (link.Substring(link.Length - 4) == ".xml")
+                            {
+                                // add to xml list
+                                //check if it's not in disallowed hashset
+                                if (!disallows.Contains(link)) {
+                                    //check if the date is allowed
+                                    if (dateAllowed)
+                                    {
+                                        xmlList.Add(link);
+                                    }
+                                    
+                                }
+                            }
+                            else if (link.Substring(link.Length - 5) == ".html")
+                            {
+                                // add to url queue
+
+                                //Console.WriteLine(reader.Value);
+                                //check if the date is allowed
+                                if (dateAllowed)
+                                {
+                                    CloudQueueMessage htmlLink = new CloudQueueMessage(reader.Value);
+                                    htmlQueue.AddMessage(htmlLink);
+                                }
+                            }
+                        }
+                        break;
                 }
             }
-
-            Console.WriteLine("done");
-            Console.ReadLine();
         }
 
 
@@ -120,8 +191,7 @@ namespace ConsoleApplication1
         public static void parseRobot(string url)
         {
             string baseUrl = url.Substring(0, url.Length - 11);
-            // global variables
-            HashSet<string> disallows = new HashSet<string>();
+            // global variable
             List<string> sitemaps = new List<string>();
 
             Console.WriteLine(baseUrl);
@@ -152,50 +222,8 @@ namespace ConsoleApplication1
             }
             string output = string.Join("\r\n", disallows.ToArray());
             string output2 = string.Join("\r\n", sitemaps.ToArray());
-            Console.WriteLine(output2);
+            //Console.WriteLine(output);
             //checkSitemap(url, reader);
-        }
-
-        public static void parseXML(string url)
-        {
-            Console.WriteLine("test");
-            XmlTextReader reader = new XmlTextReader(url);
-            string tag = "";
-            while (reader.Read())
-            {
-                switch (reader.NodeType)
-                {
-                    case XmlNodeType.Element: // The node is an element.
-                        tag = reader.Name;
-                        break;
-                    case XmlNodeType.Text: //Display the text in each element.
-                        // add timestamp
-                        if (tag == "lastmod")
-                        {
-                            //Console.WriteLine(reader.Value);
-                        }
-                        if (tag == "loc")
-                        {
-                            string link = reader.Value;
-                            //Console.WriteLine(link.Substring(link.Length - 4));
-                            if (link.Substring(link.Length - 4) == ".xml")
-                            {
-                                // add to xml queue
-                                //Console.WriteLine(reader.Value);
-                                //CloudQueueMessage xmlLink = new CloudQueueMessage(reader.Value);
-                                //xmlQueue.AddMessage(xmlLink);
-                                xmlList.Add(reader.Value); //cast to string?
-                            } else if (link.Substring(link.Length - 5) == ".html")
-                            {
-                                // add to url queue
-                                //Console.WriteLine(reader.Value);
-                                CloudQueueMessage htmlLink = new CloudQueueMessage(reader.Value);
-                                htmlQueue.AddMessage(htmlLink);
-                            }                
-                        }
-                        break;
-                }
-            }
         }
     }
 }
