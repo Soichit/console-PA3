@@ -45,38 +45,38 @@ namespace ConsoleApplication1
 
             // parseHTML("http://www.cnn.com/");
             // parseXML("http://www.cnn.com/sitemaps/sitemap-index.xml");
-            parseXML("http://www.cnn.com/sitemaps/sitemap-video-2017-02.xml");
-        
+            // parseXML("http://www.cnn.com/sitemaps/sitemap-video-2017-02.xml"); //no lastmod
+
             //Console.WriteLine(xmlList.Count()); //285
 
-            // iterate through each sitemap link in robots.txt
-            // iterate through each xml link in the first layer sitemap
-            //for (int i = 0; i < robotXmlList.Count; i++)
-            //{
-            //    //Console.WriteLine(robotXmlList[i]);
-            //    parseXML(robotXmlList[i]);
-            //    for (int j = 0; j < xmlList.Count; j++)
-            //    {
-            //        Console.WriteLine("MOO");
-            //        parseXML(xmlList[j]);
-            //    }
-            //}
-            //xmlList.ForEach(Console.WriteLine);
+            //iterate through each sitemap link in robots.txt
+            //iterate through each xml link in the first layer sitemap
+            for (int i = 0; i < robotXmlList.Count; i++)
+            {
+                //Console.WriteLine(robotXmlList[i]);
+                parseXML(robotXmlList[i]);
+                for (int j = 0; j < xmlList.Count; j++)
+                {
+                    Console.WriteLine("MOO");
+                    parseXML(xmlList[j]);
+                }
+            }
+            xmlList.ForEach(Console.WriteLine);
 
 
-            ////once all xmls are parsed, go through html queue and crawl page
-            //CloudQueueMessage message = new CloudQueueMessage("");
-            //while (message != null)
-            //{
-            //    Console.WriteLine("COW");
-            //    message = htmlQueue.GetMessage(TimeSpan.FromMinutes(1));
-            //    if (message != null)
-            //    {
-            //        Console.WriteLine(message.AsString);
-            //        htmlQueue.DeleteMessage(message);
-            //        parseHTML(message.AsString);
-            //    }
-            //}
+            //once all xmls are parsed, go through html queue and crawl page
+            CloudQueueMessage message = new CloudQueueMessage("");
+            while (message != null)
+            {
+                Console.WriteLine("COW");
+                message = htmlQueue.GetMessage(TimeSpan.FromMinutes(1));
+                if (message != null)
+                {
+                    Console.WriteLine(message.AsString);
+                    htmlQueue.DeleteMessage(message);
+                    parseHTML(message.AsString);
+                }
+            }
 
             Console.WriteLine("DONE");
             Console.ReadLine();
@@ -98,9 +98,10 @@ namespace ConsoleApplication1
                         break;
                     case XmlNodeType.Text: //text within tags
                         // if vs elseif
+                        // for cases where lastmod tag doesn't exist
                         if (tag == "sitemap" || tag == "url")
                         {
-                            dateAllowed = true; //FIX: for cases where lastmod tag doesn't exist
+                            dateAllowed = true; 
                         }
                         if (tag == "lastmod")
                         {
@@ -132,7 +133,7 @@ namespace ConsoleApplication1
                                     CloudQueueMessage htmlLink = new CloudQueueMessage(reader.Value);
                                     //assuming the type is .html or .htm
                                     htmlQueue.AddMessage(htmlLink);
-                                    //Console.WriteLine("HTML: " + htmlLink.AsString);
+                                    Console.WriteLine("HTML: " + htmlLink.AsString);
                                 }
                             }
                         }
