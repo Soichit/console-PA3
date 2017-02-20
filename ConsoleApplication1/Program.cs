@@ -37,34 +37,34 @@ namespace ConsoleApplication1
             htmlQueue.CreateIfNotExists();
             disallows = new HashSet<string>();
             cutOffDate = new DateTime(2016, 12, 1); // 12/1/2016
-            
-
             baseUrl = "http://www.cnn.com";
             string robotsUrl = baseUrl + "/robots.txt";
+
             //parseRobot(robotsUrl);
             robotXmlList.Add("http://www.cnn.com/sitemaps/sitemap-index.xml");
 
             // parseHTML("http://www.cnn.com/");
-            // parseHTML("http://www.cnn.com/2017/02/16/us/museum-removes-art-from-immigrants-trnd");
-            // parseXML("http://www.cnn.com/sitemaps/sitemap-index.xml"); //xmls
-            // parseXML("http://www.cnn.com/sitemaps/sitemap-show-2017-02.xml"); //htmls
+            // parseXML("http://www.cnn.com/sitemaps/sitemap-index.xml");
+            parseXML("http://www.cnn.com/sitemaps/sitemap-video-2017-02.xml");
+        
+            //Console.WriteLine(xmlList.Count()); //285
 
-            Console.WriteLine(xmlList.Count()); //285
+            // iterate through each sitemap link in robots.txt
+            // iterate through each xml link in the first layer sitemap
+            //for (int i = 0; i < robotXmlList.Count; i++)
+            //{
+            //    //Console.WriteLine(robotXmlList[i]);
+            //    parseXML(robotXmlList[i]);
+            //    for (int j = 0; j < xmlList.Count; j++)
+            //    {
+            //        Console.WriteLine("MOO");
+            //        parseXML(xmlList[j]);
+            //    }
+            //}
+            //xmlList.ForEach(Console.WriteLine);
 
-            for (int i = 0; i < robotXmlList.Count; i++)
-            {
-                //Console.WriteLine(robotXmlList[i]);
-                parseXML(robotXmlList[i]);
-                for (int j = 0; j < xmlList.Count; j++)
-                {
-                    parseXML(xmlList[j]);
-                    //Console.WriteLine(xmlList[j]);
-                }
-            }
-            xmlList.ForEach(Console.WriteLine);
 
-
-            //once all xml is parsed, go through html queue
+            ////once all xmls are parsed, go through html queue and crawl page
             //CloudQueueMessage message = new CloudQueueMessage("");
             //while (message != null)
             //{
@@ -77,7 +77,6 @@ namespace ConsoleApplication1
             //        parseHTML(message.AsString);
             //    }
             //}
-
 
             Console.WriteLine("DONE");
             Console.ReadLine();
@@ -92,29 +91,22 @@ namespace ConsoleApplication1
             Boolean dateAllowed = true;
             while (reader.Read())
             {
-                // dateAllowed = true; //FIX: for cases where lastmod tag doesn't exist
                 switch (reader.NodeType)
                 {
-                    case XmlNodeType.Element: // tag types
+                    case XmlNodeType.Element: //tag types
                         tag = reader.Name;
                         break;
-                    case XmlNodeType.Text: // text within tags
-                        // add timestamp
-                        if (tag == "sitemap")
+                    case XmlNodeType.Text: //text within tags
+                        // if vs elseif
+                        if (tag == "sitemap" || tag == "url")
                         {
                             dateAllowed = true; //FIX: for cases where lastmod tag doesn't exist
                         }
-                        if (tag == "url")
-                        {
-                            dateAllowed = true; //FIX: for cases where lastmod tag doesn't exist
-                        }
-
                         if (tag == "lastmod")
                         {
                             string date = reader.Value.Substring(0, 10); //format: 2017-02-17 
                             DateTime dateTime = Convert.ToDateTime(date);
                             int compare = DateTime.Compare(dateTime, cutOffDate);
-                            //Console.WriteLine("compare: " + compare);
                             if (compare >= 0)
                             {
                                 dateAllowed = true;
@@ -133,14 +125,14 @@ namespace ConsoleApplication1
                                 if (link.Substring(link.Length - 4) == ".xml")
                                 {
                                     xmlList.Add(link);
-                                    Console.WriteLine("XML" + link);
+                                    //Console.WriteLine("XML: " + link);
                                 }
                                 else
                                 {
                                     CloudQueueMessage htmlLink = new CloudQueueMessage(reader.Value);
                                     //assuming the type is .html or .htm
                                     htmlQueue.AddMessage(htmlLink);
-                                    Console.WriteLine("HTML" + htmlLink.AsString);
+                                    //Console.WriteLine("HTML: " + htmlLink.AsString);
                                 }
                             }
                         }
@@ -152,7 +144,6 @@ namespace ConsoleApplication1
 
         public static void parseHTML(string link)
         {
-            // web crawler
             HtmlWeb web = new HtmlWeb();
             HtmlDocument htmlDoc = web.Load(link); //check if link exists and is an html document
 
@@ -163,14 +154,13 @@ namespace ConsoleApplication1
                 HtmlAgilityPack.HtmlNode bodyNode = htmlDoc.DocumentNode.SelectSingleNode("//body");
                 string title = "" + htmlDoc.DocumentNode.SelectSingleNode("//head/title");
                 // insert webpage into table (FIND CODE)
+                // WORK ON
             }
             HtmlNode[] nodes = htmlDoc.DocumentNode.SelectNodes("//a[@href]").ToArray();
             foreach (HtmlNode item in nodes)
             {
-                // insert into Queue
-                //CloudQueueMessage url = new CloudQueueMessage("" + item);
+                // insert into html queue
                 string hrefValue = item.GetAttributeValue("href", string.Empty).Trim();
-
                 string correctUrl = "";
                 if (hrefValue.Length > 2)
                 {
@@ -191,7 +181,6 @@ namespace ConsoleApplication1
                     if (!disallows.Contains(correctUrl) && correctUrl.Contains("cnn.com")) // or "bleacherreport.com"
                     {
                         CloudQueueMessage htmlLink = new CloudQueueMessage(correctUrl);
-                        //Console.WriteLine(hrefValue);
                         Console.WriteLine(correctUrl);
                         htmlQueue.AddMessage(htmlLink);
                     }
@@ -229,6 +218,7 @@ namespace ConsoleApplication1
             //string output2 = string.Join("\r\n", xmlList.ToArray());
             //Console.WriteLine(output);
             //checkSitemap(url, reader);
+            //WORK ON
         }
     }
 }
